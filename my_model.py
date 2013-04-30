@@ -59,6 +59,10 @@ class Model(object):
                            dx ** 2)
         return foo
 
+a = 1.
+Ta = Model(N=16, dx=1., fu=a, fv=1., gu=1., gv=a,
+           Du=0.25, Dv=0.25, Nt=100, dt=0.01)
+
 class Model1s(object):
     def __init__(self, N=16, dx=None, m0=None, ma=None, mb=None, D=None,
                  dt=None, Nt=None):
@@ -85,13 +89,8 @@ class Model1s(object):
         r = np.zeros(np.size(m))
         r[0] = 0.
         r[-1] = 0.
-        r[1:-1] = (D * (m[0:-2] - 2. * m[1:-1] +
-                        m[2:]) /dx ** 2)
+        r[1:-1] = (D * (m[0:-2] - 2. * m[1:-1] + m[2:]) /dx ** 2)
         return r
-
-a = 1.
-Ta = Model(N=16, dx=1., fu=a, fv=1., gu=1., gv=a,
-           Du=0.25, Dv=0.25, Nt=100, dt=0.01)
 
 m1s = Model1s(N=16, dx=1./(16-1), m0=np.zeros(16), ma=1., mb=0., D=1.,
               dt=0.01, Nt=100)
