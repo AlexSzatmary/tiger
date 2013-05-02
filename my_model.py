@@ -35,7 +35,7 @@ class Robin(object):
         else:
             raise ValueError("side must be 'left' or 'right'")
 
-    def d2udx2(self, u, dx):
+    def opd2udx2(self, u, dx):
         if self.side == 'left':
             return (2 * u[1] +
                     (-2 + 2 * dx * self.a / self.b) * u[0]
@@ -51,9 +51,16 @@ class VonNeumann(Robin):
         super(VonNeumann, self).__init__(a=0, b=1, c=dudx, side=side)
 
 
+def opd2udx2(u, dx):
+    "Applies second-derivative finite difference operator on u"
+    return (u[0:-2] - 2. * u[1:-1] + u[2:]) / dx ** 2
+
+
 class Model1s(object):
+    """Time-varying reaction-diffusion type of solver
+    Solves dm/dt = D d2m/dx2 - c * m"""
     def __init__(self, N=16, L=None, m0=None, lhs=None, rhs=None, D=None,
-                 dt=None, Nt=None):
+                 dt=None, Nt=None, c=None):
         self.N = N
         self.L = L
         self.dx = L / (N - 1)
@@ -67,6 +74,7 @@ class Model1s(object):
         self.D = D
         self.dt = dt
         self.Nt = Nt
+        self.c = c
 
         self.t = np.arange(0, self.Nt) * self.dt
         if type(self.lhs) is Dirichlet:
@@ -88,20 +96,20 @@ class Model1s(object):
         if type(self.lhs) is Dirichlet:
             r[0] = 0.
         else:
-            r[0] = self.D * self.lhs.d2udx2(m, self.dx)
+            r[0] = self.D * self.lhs.opd2udx2(m, self.dx)
 
         if type(self.rhs) is Dirichlet:
             r[-1] = 0.
         else:
-            r[-1] = self.D * self.rhs.d2udx2(m, self.dx)
+            r[-1] = self.D * self.rhs.opd2udx2(m, self.dx)
 
-        r[1:-1] = (self.D * (m[0:-2] - 2. * m[1:-1] + m[2:]) / self.dx ** 2)
+        r[1:-1] = self.D * opd2udx2(m, self.dx) - self.c * m[1:-1]
         return r
 
 
 m1s = Model1s(N=16, L=1., m0=0.,
               lhs=Dirichlet(1.), rhs=VonNeumann(dudx=0., side='right'), D=1.,
-              dt=0.01, Nt=1000)
+              dt=0.01, Nt=1000, c=0.)
 
 
 def main(argv=None):
