@@ -3,6 +3,7 @@
 import numpy as np
 import scipy
 import scipy.integrate
+import numbers
 
 # Dirichlet:
 # y0[0] = a
@@ -41,16 +42,22 @@ class Robin(object):
                     (-2 - 2 * dx * self.a / self.b) * u[-1]
                     + 2 * dx * self.c / self.b)
 
+
 class VonNeumann(Robin):
     def __init__(self, dudx=None, side=None):
         super(VonNeumann, self).__init__(a=0, b=1, c=dudx, side=side)
 
 class Model1s(object):
-    def __init__(self, N=16, dx=None, m0=None, lhs=None, rhs=None, D=None,
+    def __init__(self, N=16, L=None, m0=None, lhs=None, rhs=None, D=None,
                  dt=None, Nt=None):
         self.N = N
-        self.dx = dx
-        self.m0 = m0
+        self.L = L
+        self.dx = L / (N - 1)
+        self.x = np.arange(0, N) * self.dx
+        if issubclass(type(m0), numbers.Number):
+            self.m0 = np.ones(self.N) * m0
+        else:
+            self.m0 = m0(self.x)
         self.lhs = lhs
         self.rhs = rhs
         self.D = D
@@ -85,9 +92,9 @@ class Model1s(object):
         r[1:-1] = (D * (m[0:-2] - 2. * m[1:-1] + m[2:]) / dx ** 2)
         return r
 
-m1s = Model1s(N=16, dx=1./(16-1), m0=np.zeros(16),
-              lhs=Dirichlet(1.), rhs=VonNeumann(0.), D=1.,
-              dt=0.01, Nt=100)
+m1s = Model1s(N=16, L=1., m0=0.,
+              lhs=Dirichlet(1.), rhs=VonNeumann(dudx=0., side='right'), D=1.,
+              dt=0.01, Nt=1000)
 
 def main(argv=None):
     if argv is None:
