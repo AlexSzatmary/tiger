@@ -73,23 +73,25 @@ class Model1s(object):
     def odeint_wrapper(self):
         self.m = scipy.integrate.odeint(
             self.dmdt, self.m0, self.t,
-            args=(self.dx, self.D, self.lhs, self.rhs))
+            args=(self,))
         
     @staticmethod
-    def dmdt(m, t, dx, D, lhs, rhs):
+    def dmdt(m, t, self):
+        # Watch out! Because this is a staticmethod, as required by odeint,
+        # self is the third argument
         r = np.zeros(np.size(m))
 
-        if type(lhs) is Dirichlet:
+        if type(self.lhs) is Dirichlet:
             r[0] = 0.
         else:
-            r[0] = D * lhs.d2udx2(m, dx)
+            r[0] = self.D * self.lhs.d2udx2(m, self.dx)
 
-        if type(rhs) is Dirichlet:
+        if type(self.rhs) is Dirichlet:
             r[-1] = 0.
         else:
-            r[-1] = D * rhs.d2udx2(m, dx)
+            r[-1] = self.D * self.rhs.d2udx2(m, self.dx)
 
-        r[1:-1] = (D * (m[0:-2] - 2. * m[1:-1] + m[2:]) / dx ** 2)
+        r[1:-1] = (self.D * (m[0:-2] - 2. * m[1:-1] + m[2:]) / self.dx ** 2)
         return r
 
 m1s = Model1s(N=16, L=1., m0=0.,
