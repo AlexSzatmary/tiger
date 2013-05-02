@@ -17,9 +17,12 @@ import numbers
 
 # lbc(m)
 
+
+# Boundary conditions
 class Dirichlet(object):
     def __init__(self, u_0):
         self.u_0 = u_0
+
 
 class Robin(object):
     """Boundary condition for a u + b u' = c"""
@@ -46,6 +49,7 @@ class Robin(object):
 class VonNeumann(Robin):
     def __init__(self, dudx=None, side=None):
         super(VonNeumann, self).__init__(a=0, b=1, c=dudx, side=side)
+
 
 class Model1s(object):
     def __init__(self, N=16, L=None, m0=None, lhs=None, rhs=None, D=None,
@@ -74,7 +78,7 @@ class Model1s(object):
         self.m = scipy.integrate.odeint(
             self.dmdt, self.m0, self.t,
             args=(self,))
-        
+
     @staticmethod
     def dmdt(m, t, self):
         # Watch out! Because this is a staticmethod, as required by odeint,
@@ -94,13 +98,16 @@ class Model1s(object):
         r[1:-1] = (self.D * (m[0:-2] - 2. * m[1:-1] + m[2:]) / self.dx ** 2)
         return r
 
+
 m1s = Model1s(N=16, L=1., m0=0.,
               lhs=Dirichlet(1.), rhs=VonNeumann(dudx=0., side='right'), D=1.,
               dt=0.01, Nt=1000)
 
+
 def main(argv=None):
     if argv is None:
         argv = sys.argv
+
 
 if __name__ == "__main__":
     sys.exit(main())
