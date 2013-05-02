@@ -4,116 +4,87 @@ import numpy as np
 import scipy
 import scipy.integrate
 
-class Model(object):
-    def __init__(self, N=16, dx = None, fu=None, fv=None, gu=None, gv=None,
-                 Du=None, Dv=None, Nt=None, dt=None):
-        self.N = N
-        self.dx = dx
-        self.U = np.zeros(self.N)
-        self.V = np.zeros(self.N)
-        self.fu = fu
-        self.fv = fv
-        self.gu = gu
-        self.gv = gv
-        self.Du = Du
-        self.Dv = Dv
-        self.Nt = Nt
-        self.dt = dt
+# Dirichlet:
+# y0[0] = a
+# dydt[0] = 0
+# von Neumann BC:
+# y0 = ...
+# dydt[0] = D * d2[m]/dx2 = D * (2 * m[1] +
+#                                (-2 + 2 * dx * a / b) * m[0]
+#                                -2 * dx * c / b)
+# lbc(m)
 
-    def odeint_wrapper(self):
-        y0 = np.hstack((self.U, self.V))
-        t = np.arange(self.Nt) * self.dt
-        self.y = scipy.integrate.odeint(
-            self.dydt, y0, t,
-            args=(self.N, self.dx,
-                  self.fu, self.fv, self.gu,
-                  self.gv, self.Du, self.Dv))
-        
-    @staticmethod
-    def dydt(y, t, N, dx, fu, fv, gu, gv, Du, Dv):
-        foo = np.zeros(N * 2)
-        U = y[:N]
-        V = y[N:]
-        foo[0] = (fu * U[0] + fv * V[0] +
-                  Du * (U[-1] - 2. * U[0] + U[1]) /
-                  dx ** 2)
-        foo[1:N - 1] = (fu * U[1:-1] + fv * V[1:-1] +
-                             Du * (U[0:-2] - 2. * U[1:-1] +
-                                        U[2:]) /
-                             dx ** 2)
-        foo[N - 1] = (fu * U[-1] + fv * V[-1] +
-                           Du * (U[-2] - 2. * U[-1] +
-                                      U[0]) /
-                           dx ** 2)
-                
-        foo[N] = (gu * U[0] + gv * V[0] +
-                  Dv * (V[-1] - 2. * V[0] + V[1]) /
-                  dx ** 2)
-        foo[N + 1:-1] = (gu * U[1:-1] + gv * V[1:-1] +
-                              Dv * (V[0:-2] - 2. * V[1:-1] +
-                                         V[2:]) /
-                              dx ** 2)
-        foo[-1] = (gu * U[-1] + gv * V[-1] +
-                           Dv * (V[-2] - 2. * V[-1] +
-                                      V[0]) /
-                           dx ** 2)
-        return foo
+# lbc(m)
 
-a = 1.
-Ta = Model(N=16, dx=1., fu=a, fv=1., gu=1., gv=a,
-           Du=0.25, Dv=0.25, Nt=100, dt=0.01)
+class Dirichlet(object):
+    def __init__(self, u_0):
+        self.u_0 = u_0
+
+class Robin(object):
+    """Boundary condition for a u + b u' = c"""
+    def __init__(self, a=None, b=None, c=None, side=None):
+        self.a = a
+        self.b = b
+        self.c = c
+        self.side = side
+
+    def d2udx2(self, u, dx):
+        if self.side == 'left':
+            return (2 * u[1] +
+                    (-2 + 2 * dx * self.a / self.b) * u[0]
+                    - 2 * dx * self.c / self.b)
+        elif self.side == 'right':
+            return (2 * u[-2] +
+                    (-2 - 2 * dx * self.a / self.b) * u[-1]
+                    + 2 * dx * self.c / self.b)
+
+class VonNeumann(Robin):
+    def __init__(self, dudx=None, side=None):
+        super(VonNeumann, self).__init__(a=0, b=1, c=dudx, side=side)
 
 class Model1s(object):
-    def __init__(self, N=16, dx=None, m0=None, ma=None, mb=None, D=None,
+    def __init__(self, N=16, dx=None, m0=None, lhs=None, rhs=None, D=None,
                  dt=None, Nt=None):
         self.N = N
         self.dx = dx
         self.m0 = m0
-        self.ma = ma
-        self.mb = mb
+        self.lhs = lhs
+        self.rhs = rhs
         self.D = D
         self.dt = dt
         self.Nt = Nt
 
         self.t = np.arange(0, self.Nt) * self.dt
-        self.m0[0] = self.ma
-        self.m0[-1] = self.mb
+        if type(self.lhs) is Dirichlet:
+            self.m0[0] = self.lhs.u_0
+        if type(self.rhs) is Dirichlet:
+            self.m0[-1] = self.rhs.u_0
 
     def odeint_wrapper(self):
         self.m = scipy.integrate.odeint(
             self.dmdt, self.m0, self.t,
-            args=(self.dx, self.D))
+            args=(self.dx, self.D, self.lhs, self.rhs))
         
     @staticmethod
-    def dmdt(m, t, dx, D):
+    def dmdt(m, t, dx, D, lhs, rhs):
         r = np.zeros(np.size(m))
-        r[0] = 0.
-        r[-1] = 0.
-        r[1:-1] = (D * (m[0:-2] - 2. * m[1:-1] + m[2:]) /dx ** 2)
+
+        if type(lhs) is Dirichlet:
+            r[0] = 0.
+        else:
+            r[0] = D * lhs.d2udx2(m, dx)
+
+        if type(rhs) is Dirichlet:
+            r[-1] = 0.
+        else:
+            r[-1] = D * rhs.d2udx2(m, dx)
+
+        r[1:-1] = (D * (m[0:-2] - 2. * m[1:-1] + m[2:]) / dx ** 2)
         return r
 
-m1s = Model1s(N=16, dx=1./(16-1), m0=np.zeros(16), ma=1., mb=0., D=1.,
+m1s = Model1s(N=16, dx=1./(16-1), m0=np.zeros(16),
+              lhs=Dirichlet(1.), rhs=VonNeumann(0.), D=1.,
               dt=0.01, Nt=100)
-
-class RDSSModel(object):
-    # Solves y'' = f(x, y) at steady-state using finite differences
-    def __init__(self, x_a=0., x_b=1., n_x=11, f=None):
-        self.x_a = x_a
-        self.x_b = x_b
-        self.x = np.linspace(x_a, x_b, n_x)
-        self.y = np.zeros(n_x)
-        self.h = (x_b - x_a) / (n_x - 1)
-        self.T = 1. / self.h ** 2.
-        self.f = f
-
-    def iterate(self):
-        self.Sinv = 1. / (2. / self.h ** 2. + self.f(self.x, self.y))
-        self.y[1:-1] = (self.T * self.Sinv[:-2] * self.y[:-2] +
-                        self.T * self.Sinv[2:] * self.y[2:])
-        self.boundary_conditions()
-
-    def boundary_conditions(self):
-        pass
 
 def main(argv=None):
     if argv is None:
