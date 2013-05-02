@@ -26,7 +26,10 @@ class Robin(object):
         self.a = a
         self.b = b
         self.c = c
-        self.side = side
+        if side in ['left', 'right']:
+            self.side = side
+        else:
+            raise ValueError("side must be 'left' or 'right'")
 
     def d2udx2(self, u, dx):
         if self.side == 'left':
