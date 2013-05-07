@@ -132,7 +132,7 @@ class CoupledPDESolver(object):
     dv/dt = f(v, dv/dx, d2v/dx2, u)
     etc.
     """
-    def __init__(self, L_pde=None, dt=None, Nt=None, run=True):
+    def __init__(self, L_pde=None, dt=None, Nt=None, run=False):
         self.L_pde = L_pde
         self.dt = dt
         self.Nt = Nt
@@ -231,6 +231,17 @@ m1s = PDESolver(
 # m2 = CoupledPDESolver(
 #     L_pde=[
 #         PDE(
+
+
+m2 = CoupledPDESolver(
+    L_pde=[
+        PDE(f=lambda L_u, dudx, d2udx2: d2udx2,
+            u_0=0., u_L=Dirichlet(1.),
+            u_r=Dirichlet(0.), x_r=1., n=16),
+        PDE(f=lambda L_u, dudx, d2udx2: -10 * (L_u[1] + L_u[0]),
+            u_0=0., u_L=Dirichlet(-1.),
+            u_r=Dirichlet(0.), x_r=1., n=16)],
+    dt=0.01, Nt=1000)
 
 
 def main(argv=None):
