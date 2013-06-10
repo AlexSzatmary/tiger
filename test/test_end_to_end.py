@@ -57,6 +57,24 @@ class testCoupledPDESolver(object):
             np.max(np.abs(self.model.L_pde[1].u[-1] - self.solution[1])), 0.)
 
 
+class testGridConvert(testCoupledPDESolver):
+    def setUp(self):
+        self.model = my_model.CoupledPDESolver(
+            L_pde=[
+                my_model.PDE(f=lambda L_u, dudx, d2udx2: d2udx2,
+                             u_0=0., u_L=my_model.Dirichlet(1.),
+                             u_r=my_model.Dirichlet(0.), x_r=1., n=25),
+                my_model.PDE(
+                    f=lambda L_u, dudx, d2udx2: -10 * (L_u[1] + L_u[0]),
+                    u_0=0., u_L=my_model.Dirichlet(-1.),
+                    u_r=my_model.Dirichlet(0.), x_r=1., n=16)],
+            dt=0.01, Nt=1000, run=True)
+        self.solution = [1. - self.model.L_pde[0].x,
+                         -1 + self.model.L_pde[1].x]
+
+    def test(self):
+        pass
+
 #    def test(self):
 # For uniform source
 #        

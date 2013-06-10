@@ -141,21 +141,38 @@ class CoupledPDESolver(object):
         L_n = [pde.n for pde in L_pde]
         self.L_b_r = np.cumsum(L_n)
         self.L_b_L = self.L_b_r - L_n
-        # self.make_x_to_x()
+        self.make_x_to_x()
         if run:
             self.run()
 
-    # @staticmethod
-    # def x_to_x(x_1, x_2):
-    #     return maximum(minimum((db + da) / 2 -
-    #                            abs(np.tile(a, (Nb, 1)) -
-    #                                np.tile(b, (Na, 1)).T),
-    #                            da), 0.)
+    # m_on_s[1] = dx * (m[0] / 2 + sum(m[1:4]) + m[4] / 2)
+    @staticmethod
+    def x_to_x(pde_1, pde_2):
+        a = np.tile(pde_1.x, (pde_2.n, 1))
+        b = np.tile(pde_2.x, (pde_1.n, 1)).T
+        a_l = a - pde_1.dx / 2
+        a_r = a + pde_1.dx / 2
+        b_l = b - pde_2.dx / 2
+        b_r = b + pde_2.dx / 2
+        x_l = np.maximum(a_l, b_l)
+        x_r = np.minimum(a_r, b_r)
+        return np.maximum(x_r - x_l, 0.) / pde_2.dx
+        # dxmin = min(pde_1.dx, pde_2.dx)
+        # dxmax = max(pde_1.dx, pde_2.dx)
+        # return np.maximum(np.minimum(
+        #         1. + dxmax / 2. - dxmin -
+        #         abs(np.tile(pde_1.x, (pde_2.n, 1)) -
+        #             np.tile(pde_2.x, (pde_1.n, 1)).T) / (2. * dxmin),
+        #         1.), 0.)
+        # return np.maximum(np.minimum(
+        #         -abs(np.tile(pde_1.x, (pde_2.n, 1)) -
+        #              np.tile(pde_2.x, (pde_1.n, 1)).T) / (2. * dxmin) +
+        #          dxmax / (4. * dxmin) + 0.5,
+        #         1.), 0.)
 
-    # def make_x_to_x(self):
-    #     L_x = [pde.x for pde in L_pde]
-    #     self.L_L_x_to_x = [[self.x_to_x(x_1, x_2) for x_1 in L_x]
-    #                        for x_2 in L_x]
+    def make_x_to_x(self):
+        self.L_L_x_to_x = [[self.x_to_x(pde_1, pde_2) for pde_1 in self.L_pde]
+                           for pde_2 in self.L_pde]
 
     def run(self):
         self.u = scipy.integrate.odeint(
@@ -187,28 +204,30 @@ class CoupledPDESolver(object):
         return r
 
     def d_dukdt(self, L_u, k, pde):
-        u = L_u[k]
-        r = np.zeros(np.size(u))
+        L_u_on_x = [np.dot(x_to_x, utmp) for (x_to_x, utmp) in
+                    zip(self.L_L_x_to_x[k], L_u)]
+        u_k = L_u[k]
+        r = np.zeros(np.size(u_k))
 
         if type(pde.u_L) is Dirichlet:
             r[0] = 0.
         else:
-            r[0] = pde.f([utmp[0] for utmp in L_u],
-                         pde.u_L.opdudx(u),
-                         pde.u_L.opd2udx2(u, pde.dx))
+            r[0] = pde.f([utmp[0] for utmp in L_u_on_x],
+                         pde.u_L.opdudx(u_k),
+                         pde.u_L.opd2udx2(u_k, pde.dx))
 
         if type(pde.u_r) is Dirichlet:
             r[-1] = 0.
         else:
             r[-1] = pde.f(
-                [utmp[-1] for utmp in L_u],
-                pde.u_r.opdudx(u),
-                pde.u_r.opd2udx2(u, pde.dx))
+                [utmp[-1] for utmp in L_u_on_x],
+                pde.u_r.opdudx(u_k),
+                pde.u_r.opd2udx2(u_k, pde.dx))
 
         r[1:-1] = pde.f(
-            [utmp[1:-1] for utmp in L_u],
-            opdudx(u, pde.dx),
-            opd2udx2(u, pde.dx))
+            [utmp[1:-1] for utmp in L_u_on_x],
+            opdudx(u_k, pde.dx),
+            opd2udx2(u_k, pde.dx))
         return r
 
 
@@ -242,6 +261,47 @@ m2 = CoupledPDESolver(
             u_0=0., u_L=Dirichlet(-1.),
             u_r=Dirichlet(0.), x_r=1., n=16)],
     dt=0.01, Nt=1000)
+
+
+def f0(L_u, dudx, d2udx2):
+    m = L_u[0]
+    c = L_u[1]
+    m_s = L_u[2]
+    return d2udx2 + np.maximum(0., m_s - m) - m * c
+
+m3 = CoupledPDESolver(
+    L_pde=[
+        #m
+        PDE(f=f0,
+            u_0=0., u_L=VonNeumann(dudx=0., side='left'),
+            u_r=VonNeumann(dudx=0., side='right'), x_L=0., x_r=11., n=128),
+        #c
+        PDE(f=lambda L_u, dudx, d2udx2: -L_u[1] * L_u[0],
+            u_0=1., u_L=Dirichlet(0.),
+            u_r=Dirichlet(0.), x_L=0.5, x_r=11.5, n=12),
+        #m_s
+        PDE(f=lambda L_u, dudx, d2udx2: -(L_u[2] - L_u[0]),
+            u_0=10., u_L=Dirichlet(0.),
+            u_r=Dirichlet(0.), x_L=-0.5, x_r=1.5, n=3)],
+    dt=0.01, Nt=1000, run=False)
+
+
+def m40(L_u, dudx, d2udx2):
+    m = L_u[0]
+    s = L_u[1]
+    return d2udx2 + s - m
+
+m4 = CoupledPDESolver(
+    L_pde=[
+        #m
+        PDE(f=m40,
+            u_0=0., u_L=VonNeumann(dudx=0., side='left'),
+            u_r=VonNeumann(dudx=0., side='right'), x_L=0., x_r=6., n=25),
+        #m_s
+        PDE(f=lambda L_u, dudx, d2udx2: -(L_u[1] - L_u[0]),
+            u_0=10., u_L=Dirichlet(0.),
+            u_r=Dirichlet(0.), x_L=-0.5, x_r=1.5, n=3)],
+    dt=0.01, Nt=1000, run=False)
 
 
 def main(argv=None):
