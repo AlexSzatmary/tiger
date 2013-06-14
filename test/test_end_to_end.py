@@ -1,13 +1,13 @@
 import numpy as np
-import my_model
+import tiger
 import nose
 
 class testNoSource(object):
     def setUp(self):
-        self.model = my_model.PDESolver(
-            my_model.SingleLinearPDE(
-                n=16, x_r=1., u_0=0., u_L=my_model.Dirichlet(1.),
-                u_r=my_model.Dirichlet(0.), D=1., a=0, c=0.),
+        self.model = tiger.PDESolver(
+            tiger.SingleLinearPDE(
+                n=16, x_r=1., u_0=0., u_L=tiger.Dirichlet(1.),
+                u_r=tiger.Dirichlet(0.), D=1., a=0, c=0.),
             dt=0.01, Nt=1000, run=True)
         self.solution = 1. - self.model.pde.x
 
@@ -17,19 +17,19 @@ class testNoSource(object):
 
 class testUniformSource(testNoSource):
     def setUp(self):
-        self.model = my_model.PDESolver(
-            my_model.SingleLinearPDE(
-                n=16, x_r=1., u_0=0., u_L=my_model.Dirichlet(0.),
-                u_r=my_model.Dirichlet(0.), D=1., a=0, c=1.),
+        self.model = tiger.PDESolver(
+            tiger.SingleLinearPDE(
+                n=16, x_r=1., u_0=0., u_L=tiger.Dirichlet(0.),
+                u_r=tiger.Dirichlet(0.), D=1., a=0, c=1.),
                 dt=0.01, Nt=1000, run=True)
         self.solution = self.model.pde.x * (1 - self.model.pde.x) / 2.
 
 class testVonNeumannBC(testNoSource):
     def setUp(self):
-        self.model = my_model.PDESolver(
-            my_model.SingleLinearPDE(
-                n=16, x_r=1., u_0=0., u_L=my_model.Dirichlet(0.),
-                u_r=my_model.VonNeumann(dudx=0., side='right'), D=1., a=0,
+        self.model = tiger.PDESolver(
+            tiger.SingleLinearPDE(
+                n=16, x_r=1., u_0=0., u_L=tiger.Dirichlet(0.),
+                u_r=tiger.VonNeumann(dudx=0., side='right'), D=1., a=0,
                 c=1.),
             dt=0.01, Nt=1000, run=True)
         self.solution = self.model.pde.x * (2 - self.model.pde.x) / 2.
@@ -37,15 +37,15 @@ class testVonNeumannBC(testNoSource):
 
 class testCoupledPDESolver(object):
     def setUp(self):
-        self.model = my_model.CoupledPDESolver(
+        self.model = tiger.CoupledPDESolver(
             L_pde=[
-                my_model.PDE(f=lambda L_u, dudx, d2udx2: d2udx2,
-                             u_0=0., u_L=my_model.Dirichlet(1.),
-                             u_r=my_model.Dirichlet(0.), x_r=1., n=16),
-                my_model.PDE(
+                tiger.PDE(f=lambda L_u, dudx, d2udx2: d2udx2,
+                             u_0=0., u_L=tiger.Dirichlet(1.),
+                             u_r=tiger.Dirichlet(0.), x_r=1., n=16),
+                tiger.PDE(
                     f=lambda L_u, dudx, d2udx2: -10 * (L_u[1] + L_u[0]),
-                    u_0=0., u_L=my_model.Dirichlet(-1.),
-                    u_r=my_model.Dirichlet(0.), x_r=1., n=16)],
+                    u_0=0., u_L=tiger.Dirichlet(-1.),
+                    u_r=tiger.Dirichlet(0.), x_r=1., n=16)],
             dt=0.01, Nt=1000, run=True)
         self.solution = [1. - self.model.L_pde[0].x,
                          -1 + self.model.L_pde[1].x]
@@ -59,15 +59,15 @@ class testCoupledPDESolver(object):
 
 class testGridConvert(testCoupledPDESolver):
     def setUp(self):
-        self.model = my_model.CoupledPDESolver(
+        self.model = tiger.CoupledPDESolver(
             L_pde=[
-                my_model.PDE(f=lambda L_u, dudx, d2udx2: d2udx2,
-                             u_0=0., u_L=my_model.Dirichlet(1.),
-                             u_r=my_model.Dirichlet(0.), x_r=1., n=25),
-                my_model.PDE(
+                tiger.PDE(f=lambda L_u, dudx, d2udx2: d2udx2,
+                             u_0=0., u_L=tiger.Dirichlet(1.),
+                             u_r=tiger.Dirichlet(0.), x_r=1., n=25),
+                tiger.PDE(
                     f=lambda L_u, dudx, d2udx2: -10 * (L_u[1] + L_u[0]),
-                    u_0=0., u_L=my_model.Dirichlet(-1.),
-                    u_r=my_model.Dirichlet(0.), x_r=1., n=16)],
+                    u_0=0., u_L=tiger.Dirichlet(-1.),
+                    u_r=tiger.Dirichlet(0.), x_r=1., n=16)],
             dt=0.01, Nt=1000, run=True)
         self.solution = [1. - self.model.L_pde[0].x,
                          -1 + self.model.L_pde[1].x]
