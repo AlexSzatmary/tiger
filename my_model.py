@@ -210,9 +210,12 @@ class CoupledPDESolver(object):
         L_u_on_x = [np.dot(x_to_x, utmp) for (x_to_x, utmp) in
                     zip(self.L_L_x_to_x[k], L_u)]
         u_k = L_u[k]
+        # r is the value of du/dt, not the new u value.
         r = np.zeros(np.size(u_k))
 
         if type(pde.u_L) is Dirichlet:
+            # For Dirichlet bc's, the r values are 0 because the bc value
+            # doesn't change
             r[0] = 0.
         else:
             r[0] = pde.f([utmp[0] for utmp in L_u_on_x],
@@ -241,6 +244,42 @@ class PDESolver(CoupledPDESolver):
         super(PDESolver, self).__init__(L_pde=[pde], **kwargs)
         self.pde = self.L_pde[0]
 
+
+
+class SphericalSolver(my_model.CoupledPDESolver):
+    """
+    A solver that works in spherical coordinates.
+
+    At x=0, all Robin bcs are treated as zero Von Neumann bcs.
+    """
+    def d_dukdt(self, L_u, k, pde):
+        L_u_on_x = [np.dot(x_to_x, utmp) for (x_to_x, utmp) in
+                    zip(self.L_L_x_to_x[k], L_u)]
+        u_k = L_u[k]
+        r = np.zeros(np.size(u_k))
+
+        if type(pde.u_L) is my_model.Dirichlet:
+            r[0] = 0.
+
+        if type(pde.u_r) is my_model.Dirichlet:
+            r[-1] = 0.
+        else:
+            r[-1] = pde.f(
+                [utmp[-1] for utmp in L_u_on_x],
+                pde.u_r.opdudx(u_k),
+                pde.u_r.opd2udx2(u_k, pde.dx))
+
+        r[1:-1] = pde.f(
+            [utmp[1:-1] for utmp in L_u_on_x],
+            my_model.opdudx(u_k, pde.dx),
+            my_model.opd2udx2(u_k, pde.dx))
+
+        if type(pde.u_L) is not my_model.Dirichlet:
+            # This imposes a zero Von Neumann bc. The ordinary bc operator
+            # for this is not applicable because of the singularity at x=0
+            r[0] = r[1]
+
+        return r
 
 m1s = PDESolver(
     pde=SingleLinearPDE(
@@ -305,7 +344,6 @@ m4 = CoupledPDESolver(
             u_0=10., u_L=Dirichlet(0.),
             u_r=Dirichlet(0.), x_L=-0.5, x_r=1.5, n=3)],
     dt=0.01, Nt=1000, run=False)
-
 
 def main(argv=None):
     if argv is None:
