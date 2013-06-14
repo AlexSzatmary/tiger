@@ -36,7 +36,10 @@ class Robin(object):
             raise ValueError("side must be 'left' or 'right'")
 
     def opdudx(self, u):
-        return (self.c - self.a * u) / self.b
+        if self.side == 'left':
+            return (self.c - self.a * u[0]) / self.b
+        elif self.side == 'right':
+            return (self.c - self.a * u[-1]) / self.b
 
     def opd2udx2(self, u, dx):
         if self.side == 'left':
@@ -59,7 +62,7 @@ def opdudx(u, dx):
 
     Note that this takes some array, u, of length N, but returns second
     derivatives for only nodes 2 through N-1"""
-    return (u[2:] - u[0:-2]) / dx ** 2
+    return (u[2:] - u[0:-2]) / (2 * dx)
 
 
 def opd2udx2(u, dx):
