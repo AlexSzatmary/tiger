@@ -97,6 +97,11 @@ class PDE(object):
     def __init__(self, f=None, u_0=None, u_L=None, u_r=None, x_L=0, x_r=None,
                  n=None):
         self.f = f
+        self.x_L = x_L
+        self.x_r = x_r
+        self.n = n
+        self.dx = (self.x_r - self.x_L) / (n - 1)
+        self.x = np.arange(0, n) * self.dx + self.x_L
         if issubclass(type(u_0), numbers.Number):
             self.u_0 = np.ones(n) * u_0
         else:
@@ -107,11 +112,6 @@ class PDE(object):
             self.u_0[0] = self.u_L.u_0
         if type(self.u_r) is Dirichlet:
             self.u_0[-1] = self.u_r.u_0
-        self.x_L = x_L
-        self.x_r = x_r
-        self.n = n
-        self.dx = (self.x_r - self.x_L) / (n - 1)
-        self.x = np.arange(0, n) * self.dx + self.x_L
 
 
 class SingleLinearPDE(PDE):
