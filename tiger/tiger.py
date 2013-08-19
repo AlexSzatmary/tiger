@@ -60,7 +60,7 @@ class VonNeumann(Robin):
 def opdudx(u, dx):
     """Applies second-order first-derivate finite difference operator on u
 
-    Note that this takes some array, u, of length N, but returns second
+    Note that this takes some array, u, of length N, but returns
     derivatives for only nodes 2 through N-1"""
     return (u[2:] - u[0:-2]) / (2 * dx)
 
