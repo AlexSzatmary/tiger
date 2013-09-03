@@ -64,3 +64,41 @@ m4 = CoupledPDESolver(
             u_0=10., u_L=Dirichlet(0.),
             u_r=Dirichlet(0.), x_L=-0.5, x_r=1.5, n=3)],
     dt=0.01, Nt=1000, run=False)
+
+# m5 and m6 are examples using continuity boundary condition
+m5 = CoupledPDESolver(
+    L_pde=[
+        PDE(f=lambda L_u, dudx, d2udx2: 2 * d2udx2 + 1.,
+            u_0=0., u_L=Dirichlet(0.),
+            u_r=None, x_L=-1., x_r=0., n=65),
+        PDE(f=lambda L_u, dudx, d2udx2: d2udx2 + 1.,
+            u_0=0., u_L=None,
+            u_r=Dirichlet(0.), x_L=0., x_r=1., n=65)],
+    dt=1., Nt=1000, run=False)
+m5.L_pde[0].D = 2.
+m5.L_pde[1].D = 1.
+c = Continuity(left_index=0, right_index=1,
+                                    L_pde=m5.L_pde)
+m5.L_continuities.append(c)
+m5.L_pde[0].u_r = c
+m5.L_pde[1].u_L = c
+
+# Solution
+# plot((-x ** 2 / 4 + x / 12 + 1/3, (x, -1, 0)), (-x ** 2 / 2 + x / 6 + 1 / 3, (x, 0, 1)))
+
+m6 = CoupledPDESolver(
+    L_pde=[
+        PDE(f=lambda L_u, dudx, d2udx2: d2udx2 + 1.,
+            u_0=0., u_L=Dirichlet(0.),
+            u_r=None, x_L=-1., x_r=0., n=65),
+        PDE(f=lambda L_u, dudx, d2udx2: d2udx2 + 1.,
+            u_0=0., u_L=None,
+            u_r=Dirichlet(0.), x_L=0., x_r=1., n=65)],
+    dt=1., Nt=1000, run=False)
+m6.L_pde[0].D = 1.
+m6.L_pde[1].D = 1.
+c = Continuity(left_index=0, right_index=1,
+                                    L_pde=m6.L_pde)
+m6.L_continuities.append(c)
+m6.L_pde[0].u_r = c
+m6.L_pde[1].u_L = c

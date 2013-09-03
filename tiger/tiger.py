@@ -57,6 +57,26 @@ class VonNeumann(Robin):
         super(VonNeumann, self).__init__(a=0, b=1, c=dudx, side=side)
 
 
+# Continuity boundary conditions don't work like the others. The
+# continuity BC has to be set up *after* the list of PDEs is initialized
+# so that it can see the PDEs that it connects.
+class Continuity(object):
+    def __init__(self, left_index=None, right_index=None, L_pde=None):
+        self.left_index = left_index
+        self.right_index = right_index
+        self.left = L_pde[left_index]
+        self.right = L_pde[right_index]
+
+    # Instead of calculating du/dx and d2u/dx2, this just specififies
+    # two things about u at the boundary:
+    # 1. u is continuous across the interface
+    # 2. D * du/dx is continuous across the interface
+    def unext(self, u_a_m1, u_b_1):
+        return ((u_a_m1 * self.left.D / self.left.dx +
+                 u_b_1 * self.right.D / self.right.dx) /
+                (self.left.D / self.left.dx + self.right.D / self.right.dx))
+    
+
 def opdudx(u, dx):
     """Applies second-order first-derivate finite difference operator on u
 
@@ -145,6 +165,9 @@ class CoupledPDESolver(object):
         self.L_b_r = np.cumsum(L_n)
         self.L_b_L = self.L_b_r - L_n
         self.make_x_to_x()
+        # No continuity conditions specified at outset; these can be added
+        # later.
+        self.L_continuities = []
         if run:
             self.run()
 
@@ -204,6 +227,17 @@ class CoupledPDESolver(object):
             # L_u_on_x_k = [np.dot(xtox, u) for (xtox, u) in zip(
             #         self.L_L_xtox[k], L_u)]
             r[b_L:b_r] = self.d_dukdt(L_u, k, pde)
+
+        # Effects of continuity boundary conditions have to be accounted for
+        # after all of the PDE u's are updated
+        for c in self.L_continuities:
+            u_0 = u[self.L_b_r[c.left_index] - 1]
+            u1_a_m1 = u[self.L_b_r[c.left_index] - 2] + r[self.L_b_r[c.left_index] - 2]
+            u1_b_1 = u[self.L_b_L[c.right_index] + 1] + r[self.L_b_L[c.right_index] + 1]
+            unext = c.unext(u1_a_m1, u1_b_1)
+            dudt = unext - u_0
+            r[self.L_b_r[c.left_index] - 1] = dudt
+            r[self.L_b_L[c.right_index]] = dudt
         return r
 
     def d_dukdt(self, L_u, k, pde):
@@ -217,6 +251,8 @@ class CoupledPDESolver(object):
             # For Dirichlet bc's, the r values are 0 because the bc value
             # doesn't change
             r[0] = 0.
+        elif type(pde.u_L) is Continuity:
+            pass
         else:
             r[0] = pde.f([utmp[0] for utmp in L_u_on_x],
                          pde.u_L.opdudx(u_k),
@@ -224,6 +260,8 @@ class CoupledPDESolver(object):
 
         if type(pde.u_r) is Dirichlet:
             r[-1] = 0.
+        elif type(pde.u_r) is Continuity:
+            pass
         else:
             r[-1] = pde.f(
                 [utmp[-1] for utmp in L_u_on_x],
@@ -263,6 +301,8 @@ class SphericalSolver(CoupledPDESolver):
 
         if type(pde.u_r) is Dirichlet:
             r[-1] = 0.
+        elif type(pde.u_r) is Continuity:
+            pass
         else:
             r[-1] = pde.f(
                 [utmp[-1] for utmp in L_u_on_x],
