@@ -57,6 +57,10 @@ class VonNeumann(Robin):
         super(VonNeumann, self).__init__(a=0, b=1, c=dudx, side=side)
 
 
+class SphericalVonNeumannZero(object):
+    def __init__(self):
+        pass
+
 # Continuity boundary conditions don't work like the others. The
 # continuity BC has to be set up *after* the list of PDEs is initialized
 # so that it can see the PDEs that it connects.
@@ -247,12 +251,19 @@ class CoupledPDESolver(object):
         # r is the value of du/dt, not the new u value.
         r = np.zeros(np.size(u_k))
 
+        r[1:-1] = pde.f(
+            [utmp[1:-1] for utmp in L_u_on_x],
+            opdudx(u_k, pde.dx),
+            opd2udx2(u_k, pde.dx))
+
         if type(pde.u_L) is Dirichlet:
             # For Dirichlet bc's, the r values are 0 because the bc value
             # doesn't change
             r[0] = 0.
         elif type(pde.u_L) is Continuity:
             pass
+        elif type(pde.u_L) is SphericalVonNeumannZero:
+            r[0] = r[1]
         else:
             r[0] = pde.f([utmp[0] for utmp in L_u_on_x],
                          pde.u_L.opdudx(u_k),
@@ -268,10 +279,6 @@ class CoupledPDESolver(object):
                 pde.u_r.opdudx(u_k),
                 pde.u_r.opd2udx2(u_k, pde.dx))
 
-        r[1:-1] = pde.f(
-            [utmp[1:-1] for utmp in L_u_on_x],
-            opdudx(u_k, pde.dx),
-            opd2udx2(u_k, pde.dx))
         return r
 
 

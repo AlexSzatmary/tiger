@@ -102,3 +102,22 @@ c = Continuity(left_index=0, right_index=1,
 m6.L_continuities.append(c)
 m6.L_pde[0].u_r = c
 m6.L_pde[1].u_L = c
+
+m7 = CoupledPDESolver(
+    L_pde=[
+        PDE(f=lambda L_u, dudx, d2udx2: d2udx2 + 1.,
+            u_0=1., u_L=Dirichlet(0.),
+            u_r=None, x_L=-1., x_r=0., n=65),
+        PDE(f=lambda L_u, dudx, d2udx2: d2udx2 + 1.,
+            u_0=0., u_L=None,
+            u_r=Dirichlet(0.), x_L=0., x_r=1., n=65)],
+    dt=1., Nt=1000, run=False)
+m7.L_pde[0].D = 1.
+m7.L_pde[1].D = 1.
+c = Continuity(left_index=0, right_index=1,
+                                    L_pde=m7.L_pde)
+m7.L_continuities.append(c)
+m7.L_pde[0].u_r = c
+m7.L_pde[1].u_L = c
+m7.L_pde[0].u_0[-1] = 0.5
+m7.L_pde[1].u_0[0] = 0.5
