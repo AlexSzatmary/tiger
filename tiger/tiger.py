@@ -23,17 +23,24 @@ class Dirichlet(object):
     def __init__(self, u_0):
         self.u_0 = u_0
 
+    def set_pde(self, pde, side):
+        pass
+
+    def opdudt(self, L_u, u_k):
+        return 0.
+
 
 class Robin(object):
     """Boundary condition for a u + b u' = c"""
-    def __init__(self, a=None, b=None, c=None, side=None):
+    def __init__(self, a=None, b=None, c=None):
         self.a = a
         self.b = b
         self.c = c
-        if side in ['left', 'right']:
-            self.side = side
-        else:
-            raise ValueError("side must be 'left' or 'right'")
+
+    def set_pde(self, pde, side):
+        self.dx = pde.dx
+        self.f = pde.f
+        self.side = side
 
     def opdudx(self, u):
         if self.side == 'left':
@@ -41,24 +48,37 @@ class Robin(object):
         elif self.side == 'right':
             return (self.c - self.a * u[-1]) / self.b
 
-    def opd2udx2(self, u, dx):
+    def opd2udx2(self, u):
         if self.side == 'left':
             return (2 * u[1] +
-                    (-2 + 2 * dx * self.a / self.b) * u[0]
-                    - 2 * dx * self.c / self.b) / dx ** 2
+                    (-2 + 2 * self.dx * self.a / self.b) * u[0]
+                    - 2 * self.dx * self.c / self.b) / self.dx ** 2
         elif self.side == 'right':
             return (2 * u[-2] +
-                    (-2 - 2 * dx * self.a / self.b) * u[-1]
-                    + 2 * dx * self.c / self.b) / dx ** 2
+                    (-2 - 2 * self.dx * self.a / self.b) * u[-1]
+                    + 2 * self.dx * self.c / self.b) / self.dx ** 2
+
+    def opdudt(self, L_u, u_k):
+        if self.side == 'left':
+            u_b = [u[0] for u in L_u]
+        elif self.side == 'right':
+            u_b = [u[-1] for u in L_u]
+        return self.f(u_b, self.opdudx(u_k), self.opd2udx2(u_k))
 
 
 class VonNeumann(Robin):
-    def __init__(self, dudx=None, side=None):
-        super(VonNeumann, self).__init__(a=0, b=1, c=dudx, side=side)
+    def __init__(self, dudx=None):
+        super(VonNeumann, self).__init__(a=0, b=1, c=dudx)
 
 
 class SphericalVonNeumannZero(object):
+    '''
+    Always assumed to be on the left
+    '''
     def __init__(self):
+        pass
+
+    def set_pde(self, pde, side):
         pass
 
 
@@ -79,10 +99,14 @@ class Continuity(object):
         '''
         self.left_index = left_index
         self.right_index = right_index
-        self.left = L_pde[left_index]
-        self.right = L_pde[right_index]
 
-    def opdudt(self, L_u):
+    def set_pde(self, pde, side):
+        if side == 'left':
+            self.right = pde
+        if side == 'right':
+            self.left = pde
+
+    def opdudt(self, L_u, u_k):
         '''
         Operator giving du/dt for point of continuity. This kind of operator
         for the continuity condition is specific to a problem type, but is not
@@ -149,7 +173,9 @@ class PDE(object):
         else:
             self.u_0 = u_0(self.x)
         self.u_L = u_L
+        self.u_L.set_pde(self, 'left')
         self.u_r = u_r
+        self.u_r.set_pde(self, 'right')
         if type(self.u_L) is Dirichlet:
             self.u_0[0] = self.u_L.u_0
         if type(self.u_r) is Dirichlet:
@@ -187,9 +213,6 @@ class CoupledPDESolver(object):
         self.L_b_r = np.cumsum(L_n)
         self.L_b_L = self.L_b_r - L_n
         self.make_x_to_x()
-        # No continuity conditions specified at outset; these can be added
-        # later.
-        self.L_continuities = []
         if run:
             self.run()
 
@@ -269,28 +292,12 @@ class CoupledPDESolver(object):
             opdudx(u_k, pde.dx),
             opd2udx2(u_k, pde.dx))
 
-        if type(pde.u_L) is Dirichlet:
-            # For Dirichlet bc's, the r values are 0 because the bc value
-            # doesn't change
-            r[0] = 0.
-        elif type(pde.u_L) is Continuity:
-            r[0] = pde.u_L.opdudt(L_u)
-        elif type(pde.u_L) is SphericalVonNeumannZero:
+        if type(pde.u_L) is SphericalVonNeumannZero:
             r[0] = r[1]
         else:
-            r[0] = pde.f([utmp[0] for utmp in L_u_on_x],
-                         pde.u_L.opdudx(u_k),
-                         pde.u_L.opd2udx2(u_k, pde.dx))
+            r[0] = pde.u_L.opdudt(L_u, u_k)
 
-        if type(pde.u_r) is Dirichlet:
-            r[-1] = 0.
-        elif type(pde.u_r) is Continuity:
-            r[-1] = pde.u_r.opdudt(L_u)
-        else:
-            r[-1] = pde.f(
-                [utmp[-1] for utmp in L_u_on_x],
-                pde.u_r.opdudx(u_k),
-                pde.u_r.opd2udx2(u_k, pde.dx))
+        r[-1] = pde.u_r.opdudt(L_u, u_k)
 
         return r
 
@@ -301,44 +308,6 @@ class PDESolver(CoupledPDESolver):
     def __init__(self, pde=None, **kwargs):
         super(PDESolver, self).__init__(L_pde=[pde], **kwargs)
         self.pde = self.L_pde[0]
-
-
-class SphericalSolver(CoupledPDESolver):
-    """
-    A solver that works in spherical coordinates.
-
-    At x=0, all Robin bcs are treated as zero Von Neumann bcs.
-    """
-    def d_dukdt(self, L_u, k, pde):
-        L_u_on_x = [np.dot(x_to_x, utmp) for (x_to_x, utmp) in
-                    zip(self.L_L_x_to_x[k], L_u)]
-        u_k = L_u[k]
-        r = np.zeros(np.size(u_k))
-
-        if type(pde.u_L) is Dirichlet:
-            r[0] = 0.
-
-        if type(pde.u_r) is Dirichlet:
-            r[-1] = 0.
-        elif type(pde.u_r) is Continuity:
-            pass
-        else:
-            r[-1] = pde.f(
-                [utmp[-1] for utmp in L_u_on_x],
-                pde.u_r.opdudx(u_k),
-                pde.u_r.opd2udx2(u_k, pde.dx))
-
-        r[1:-1] = pde.f(
-            [utmp[1:-1] for utmp in L_u_on_x],
-            opdudx(u_k, pde.dx),
-            opd2udx2(u_k, pde.dx))
-
-        if type(pde.u_L) is not Dirichlet:
-            # This imposes a zero Von Neumann bc. The ordinary bc operator
-            # for this is not applicable because of the singularity at x=0
-            r[0] = r[1]
-
-        return r
 
 
 def main(argv=None):

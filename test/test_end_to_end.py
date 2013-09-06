@@ -29,7 +29,7 @@ class testVonNeumannBC(testNoSource):
         self.model = tiger.PDESolver(
             tiger.SingleLinearPDE(
                 n=16, x_r=1., u_0=0., u_L=tiger.Dirichlet(0.),
-                u_r=tiger.VonNeumann(dudx=0., side='right'), D=1., a=0,
+                u_r=tiger.VonNeumann(dudx=0.), D=1., a=0,
                 c=1.),
             dt=0.01, Nt=1000, run=True)
         self.solution = self.model.pde.x * (2 - self.model.pde.x) / 2.
@@ -82,22 +82,18 @@ class testGridConvert(testCoupledPDESolver):
 
 class testContinuityCondition(object):
     def setUp(self):
+        c = tiger.Continuity(left_index=0, right_index=1)
         self.model = tiger.CoupledPDESolver(
             L_pde=[
                 tiger.PDE(f=lambda L_u, dudx, d2udx2: 2 * d2udx2 + 1.,
                     u_0=0., u_L=tiger.Dirichlet(0.),
-                    u_r=None, x_L=-1., x_r=0., n=65),
+                    u_r=c, x_L=-1., x_r=0., n=65),
                 tiger.PDE(f=lambda L_u, dudx, d2udx2: d2udx2 + 1.,
-                    u_0=0., u_L=None,
+                    u_0=0., u_L=c,
                     u_r=tiger.Dirichlet(0.), x_L=0., x_r=1., n=65)],
             dt=1., Nt=1000, run=False)
         self.model.L_pde[0].D = 2.
         self.model.L_pde[1].D = 1.
-        c = tiger.Continuity(left_index=0, right_index=1,
-                             L_pde=self.model.L_pde)
-        self.model.L_continuities.append(c)
-        self.model.L_pde[0].u_r = c
-        self.model.L_pde[1].u_L = c
         self.model.run()
 
         self.solution = [
@@ -115,23 +111,19 @@ class testContinuityCondition(object):
 
 class testContinuityConditionDiscontinuity(object):
     def setUp(self):
+        c = tiger.Continuity(left_index=0, right_index=1)
         self.model = tiger.CoupledPDESolver(
             L_pde=[
                 tiger.PDE(f=lambda L_u, dudx, d2udx2: 2 * d2udx2 + 1.,
                     u_0=1., u_L=tiger.Dirichlet(0.),
-                    u_r=None, x_L=-1., x_r=0., n=65),
+                    u_r=c, x_L=-1., x_r=0., n=65),
                 tiger.PDE(f=lambda L_u, dudx, d2udx2: d2udx2 + 1.,
-                    u_0=0., u_L=None,
+                    u_0=0., u_L=c,
                     u_r=tiger.Dirichlet(0.), x_L=0., x_r=1., n=65)],
             dt=1e-3, Nt=1000, run=False)
         self.model.L_pde[0].u_0[-1] = 0.
         self.model.L_pde[0].D = 2.
         self.model.L_pde[1].D = 1.
-        c = tiger.Continuity(left_index=0, right_index=1,
-                             L_pde=self.model.L_pde)
-        self.model.L_continuities.append(c)
-        self.model.L_pde[0].u_r = c
-        self.model.L_pde[1].u_L = c
         self.model.run()
 
         self.solution = [
