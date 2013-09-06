@@ -61,25 +61,43 @@ class SphericalVonNeumannZero(object):
     def __init__(self):
         pass
 
-# Continuity boundary conditions don't work like the others. The
-# continuity BC has to be set up *after* the list of PDEs is initialized
-# so that it can see the PDEs that it connects.
+
 class Continuity(object):
+    '''
+    A continuity boundary condition for the heat equation in rectangular
+    coordinates with no source
+    '''
     def __init__(self, left_index=None, right_index=None, L_pde=None):
+        '''
+        Set up the continuity condition for the diffusion after initializing
+        the PDEs it links. left_index and right_index are the indices to L_pde
+        that give the subdomains on the left and right sides of the continuity
+        point, respectively. L_pde is the list of PDEs.
+
+        This assumes that u at the point of continuity is the same for both
+        subdomains.
+        '''
         self.left_index = left_index
         self.right_index = right_index
         self.left = L_pde[left_index]
         self.right = L_pde[right_index]
 
-    # Instead of calculating du/dx and d2u/dx2, this just specififies
-    # two things about u at the boundary:
-    # 1. u is continuous across the interface
-    # 2. D * du/dx is continuous across the interface
-    def unext(self, u_a_m1, u_b_1):
-        return ((u_a_m1 * self.left.D / self.left.dx +
-                 u_b_1 * self.right.D / self.right.dx) /
-                (self.left.D / self.left.dx + self.right.D / self.right.dx))
-    
+    def opdudt(self, L_u):
+        '''
+        Operator giving du/dt for point of continuity. This kind of operator
+        for the continuity condition is specific to a problem type, but is not
+        difficult to re-implement for other problems. It would probably be
+        best to expand its usefulness by deriving it explicitly in terms of
+        du/dx and d2u/dx2 operators. As it is now, it's just the d2u/dx2
+        operator.
+        '''
+        u_a_m2 = L_u[self.left_index][-2]
+        u_ab = L_u[self.right_index][0]
+        u_b_1 = L_u[self.right_index][1]
+        return ((self.right.D * (u_b_1 - u_ab) / self.right.dx -
+                 self.left.D * (u_ab - u_a_m2) / self.left.dx) /
+                (self.left.dx / 2. + self.right.dx / 2.))
+
 
 def opdudx(u, dx):
     """Applies second-order first-derivate finite difference operator on u
@@ -224,25 +242,20 @@ class CoupledPDESolver(object):
         # Split the u vector into vectors representing each function being
         # solved for. Note that this creates views of u, so each item in L_u
         # should not be modified.
-        L_u = [u[b_L:b_r] for (b_L, b_r) in zip(self.L_b_L, self.L_b_r)]
+        L_u = self.split_u(u)
         r = np.zeros(np.shape(u))
         for (k, b_L, b_r, pde) in zip(range(len(self.L_pde)),
                                       self.L_b_L, self.L_b_r, self.L_pde):
             # L_u_on_x_k = [np.dot(xtox, u) for (xtox, u) in zip(
             #         self.L_L_xtox[k], L_u)]
             r[b_L:b_r] = self.d_dukdt(L_u, k, pde)
-
-        # Effects of continuity boundary conditions have to be accounted for
-        # after all of the PDE u's are updated
-        for c in self.L_continuities:
-            u_0 = u[self.L_b_r[c.left_index] - 1]
-            u1_a_m1 = u[self.L_b_r[c.left_index] - 2] + r[self.L_b_r[c.left_index] - 2]
-            u1_b_1 = u[self.L_b_L[c.right_index] + 1] + r[self.L_b_L[c.right_index] + 1]
-            unext = c.unext(u1_a_m1, u1_b_1)
-            dudt = unext - u_0
-            r[self.L_b_r[c.left_index] - 1] = dudt
-            r[self.L_b_L[c.right_index]] = dudt
         return r
+
+    def split_u(self, u):
+        '''
+        Splits the u vector handled by odeint into each u_i
+        '''
+        return [u[b_L:b_r] for (b_L, b_r) in zip(self.L_b_L, self.L_b_r)]
 
     def d_dukdt(self, L_u, k, pde):
         L_u_on_x = [np.dot(x_to_x, utmp) for (x_to_x, utmp) in
@@ -261,7 +274,7 @@ class CoupledPDESolver(object):
             # doesn't change
             r[0] = 0.
         elif type(pde.u_L) is Continuity:
-            pass
+            r[0] = pde.u_L.opdudt(L_u)
         elif type(pde.u_L) is SphericalVonNeumannZero:
             r[0] = r[1]
         else:
@@ -272,7 +285,7 @@ class CoupledPDESolver(object):
         if type(pde.u_r) is Dirichlet:
             r[-1] = 0.
         elif type(pde.u_r) is Continuity:
-            pass
+            r[-1] = pde.u_r.opdudt(L_u)
         else:
             r[-1] = pde.f(
                 [utmp[-1] for utmp in L_u_on_x],
@@ -288,7 +301,6 @@ class PDESolver(CoupledPDESolver):
     def __init__(self, pde=None, **kwargs):
         super(PDESolver, self).__init__(L_pde=[pde], **kwargs)
         self.pde = self.L_pde[0]
-
 
 
 class SphericalSolver(CoupledPDESolver):
