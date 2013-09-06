@@ -1,25 +1,15 @@
 #!/usr/bin/env python
-
 import numpy as np
 import scipy
 import scipy.integrate
 import numbers
 
-# Dirichlet:
-# y0[0] = a
-# dydt[0] = 0
-# von Neumann BC:
-# y0 = ...
-# dydt[0] = D * d2[m]/dx2 = D * (2 * m[1] +
-#                                (-2 + 2 * dx * a / b) * m[0]
-#                                -2 * dx * c / b)
-# lbc(m)
-
-# lbc(m)
-
 
 # Boundary conditions
 class Dirichlet(object):
+    '''
+    Represents Dirichlet boundary conditions that are constant over time.
+    '''
     def __init__(self, u_0):
         self.u_0 = u_0
 
@@ -73,13 +63,31 @@ class VonNeumann(Robin):
 
 class SphericalVonNeumannZero(object):
     '''
-    Always assumed to be on the left
+    This is the boundary condition to use for r=0 in a PDE in spherical
+    coordinates
+
+    It is always assumed that r in [0, r_max], so this bc is the bc at the
+    left end of the domain.
     '''
     def __init__(self):
         pass
 
     def set_pde(self, pde, side):
-        pass
+        self.pde = pde
+        self.dx = pde.dx
+
+    def opdudt(self, t, x, L_u, u_k):
+        # This operator is derived as,
+        # du/dt = (D/r^2) d/dr (r^2 du/dr)
+        #       = D * (d^2 u/dr^2 + (2 / r) * du / dr)
+        # Taking the limit as r -> 0:
+        # (2 / r) * du / dr -> 2 * d^2 u/dr^2
+        # therefore, du/dt = 3 * d^2 u / dr^2 in the limit of r -> 0
+        # d^2u/dr^2 @r=0 ~ (u[-1] - 2 * u[0] + u[1]) / dr^2
+        # u[-1] = u[1] (symmetry)
+        # therefore,
+        # du/dt = 3 * D * 2 * (u[1] - u[0]) / dr^2
+        return 6 * self.pde.D * (u_k[1] - u_k[0]) / self.dx ** 2
 
 
 class Continuity(object):
@@ -216,7 +224,6 @@ class CoupledPDESolver(object):
         if run:
             self.run()
 
-    # m_on_s[1] = dx * (m[0] / 2 + sum(m[1:4]) + m[4] / 2)
     @staticmethod
     def x_to_x(pde_1, pde_2):
         a = np.tile(pde_1.x, (pde_2.n, 1))
@@ -228,18 +235,6 @@ class CoupledPDESolver(object):
         x_l = np.maximum(a_l, b_l)
         x_r = np.minimum(a_r, b_r)
         return np.maximum(x_r - x_l, 0.) / pde_2.dx
-        # dxmin = min(pde_1.dx, pde_2.dx)
-        # dxmax = max(pde_1.dx, pde_2.dx)
-        # return np.maximum(np.minimum(
-        #         1. + dxmax / 2. - dxmin -
-        #         abs(np.tile(pde_1.x, (pde_2.n, 1)) -
-        #             np.tile(pde_2.x, (pde_1.n, 1)).T) / (2. * dxmin),
-        #         1.), 0.)
-        # return np.maximum(np.minimum(
-        #         -abs(np.tile(pde_1.x, (pde_2.n, 1)) -
-        #              np.tile(pde_2.x, (pde_1.n, 1)).T) / (2. * dxmin) +
-        #          dxmax / (4. * dxmin) + 0.5,
-        #         1.), 0.)
 
     def make_x_to_x(self):
         self.L_L_x_to_x = [[self.x_to_x(pde_1, pde_2) for pde_1 in self.L_pde]
@@ -292,14 +287,8 @@ class CoupledPDESolver(object):
             [utmp[1:-1] for utmp in L_u_on_x],
             opdudx(u_k, pde.dx),
             opd2udx2(u_k, pde.dx))
-
-        if type(pde.u_L) is SphericalVonNeumannZero:
-            r[0] = r[1]
-        else:
-            r[0] = pde.u_L.opdudt(t, pde.x[0], L_u, u_k)
-
+        r[0] = pde.u_L.opdudt(t, pde.x[0], L_u, u_k)
         r[-1] = pde.u_r.opdudt(t, pde.x[-1], L_u, u_k)
-
         return r
 
 
