@@ -39,11 +39,11 @@ class testCoupledPDESolver(object):
     def setUp(self):
         self.model = tiger.CoupledPDESolver(
             L_pde=[
-                tiger.PDE(f=lambda L_u, dudx, d2udx2: d2udx2,
+                tiger.PDE(f=lambda t, x, L_u, dudx, d2udx2: d2udx2,
                              u_0=0., u_L=tiger.Dirichlet(1.),
                              u_r=tiger.Dirichlet(0.), x_r=1., n=16),
                 tiger.PDE(
-                    f=lambda L_u, dudx, d2udx2: -10 * (L_u[1] + L_u[0]),
+                    f=lambda t, x, L_u, dudx, d2udx2: -10 * (L_u[1] + L_u[0]),
                     u_0=0., u_L=tiger.Dirichlet(-1.),
                     u_r=tiger.Dirichlet(0.), x_r=1., n=16)],
             dt=0.01, Nt=1000, run=True)
@@ -61,11 +61,11 @@ class testGridConvert(testCoupledPDESolver):
     def setUp(self):
         self.model = tiger.CoupledPDESolver(
             L_pde=[
-                tiger.PDE(f=lambda L_u, dudx, d2udx2: d2udx2,
+                tiger.PDE(f=lambda t, x, L_u, dudx, d2udx2: d2udx2,
                              u_0=0., u_L=tiger.Dirichlet(1.),
                              u_r=tiger.Dirichlet(0.), x_r=1., n=25),
                 tiger.PDE(
-                    f=lambda L_u, dudx, d2udx2: -10 * (L_u[1] + L_u[0]),
+                    f=lambda t, x, L_u, dudx, d2udx2: -10 * (L_u[1] + L_u[0]),
                     u_0=0., u_L=tiger.Dirichlet(-1.),
                     u_r=tiger.Dirichlet(0.), x_r=1., n=16)],
             dt=0.01, Nt=1000, run=True)
@@ -85,10 +85,10 @@ class testContinuityCondition(object):
         c = tiger.Continuity(left_index=0, right_index=1)
         self.model = tiger.CoupledPDESolver(
             L_pde=[
-                tiger.PDE(f=lambda L_u, dudx, d2udx2: 2 * d2udx2 + 1.,
+                tiger.PDE(f=lambda t, x, L_u, dudx, d2udx2: 2 * d2udx2 + 1.,
                     u_0=0., u_L=tiger.Dirichlet(0.),
                     u_r=c, x_L=-1., x_r=0., n=65),
-                tiger.PDE(f=lambda L_u, dudx, d2udx2: d2udx2 + 1.,
+                tiger.PDE(f=lambda t, x, L_u, dudx, d2udx2: d2udx2 + 1.,
                     u_0=0., u_L=c,
                     u_r=tiger.Dirichlet(0.), x_L=0., x_r=1., n=65)],
             dt=1., Nt=1000, run=False)
@@ -114,10 +114,10 @@ class testContinuityConditionDiscontinuity(object):
         c = tiger.Continuity(left_index=0, right_index=1)
         self.model = tiger.CoupledPDESolver(
             L_pde=[
-                tiger.PDE(f=lambda L_u, dudx, d2udx2: 2 * d2udx2 + 1.,
+                tiger.PDE(f=lambda t, x, L_u, dudx, d2udx2: 2 * d2udx2 + 1.,
                     u_0=1., u_L=tiger.Dirichlet(0.),
                     u_r=c, x_L=-1., x_r=0., n=65),
-                tiger.PDE(f=lambda L_u, dudx, d2udx2: d2udx2 + 1.,
+                tiger.PDE(f=lambda t, x, L_u, dudx, d2udx2: d2udx2 + 1.,
                     u_0=0., u_L=c,
                     u_r=tiger.Dirichlet(0.), x_L=0., x_r=1., n=65)],
             dt=1e-3, Nt=1000, run=False)

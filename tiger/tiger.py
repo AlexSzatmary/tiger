@@ -26,7 +26,7 @@ class Dirichlet(object):
     def set_pde(self, pde, side):
         pass
 
-    def opdudt(self, L_u, u_k):
+    def opdudt(self, t, x, L_u, u_k):
         return 0.
 
 
@@ -58,12 +58,12 @@ class Robin(object):
                     (-2 - 2 * self.dx * self.a / self.b) * u[-1]
                     + 2 * self.dx * self.c / self.b) / self.dx ** 2
 
-    def opdudt(self, L_u, u_k):
+    def opdudt(self, t, x, L_u, u_k):
         if self.side == 'left':
             u_b = [u[0] for u in L_u]
         elif self.side == 'right':
             u_b = [u[-1] for u in L_u]
-        return self.f(u_b, self.opdudx(u_k), self.opd2udx2(u_k))
+        return self.f(t, x, u_b, self.opdudx(u_k), self.opd2udx2(u_k))
 
 
 class VonNeumann(Robin):
@@ -106,7 +106,7 @@ class Continuity(object):
         if side == 'right':
             self.left = pde
 
-    def opdudt(self, L_u, u_k):
+    def opdudt(self, t, x, L_u, u_k):
         '''
         Operator giving du/dt for point of continuity. This kind of operator
         for the continuity condition is specific to a problem type, but is not
@@ -188,7 +188,7 @@ class SingleLinearPDE(PDE):
         self.a = a
         self.c = c
 
-        def f(L_u, up, upp):
+        def f(t, x, L_u, up, upp):
             "du/dt = D d2u/dx2 + a u + c"
             return D * upp + a * L_u[0] + c
         super(SingleLinearPDE, self).__init__(f=f, **kwargs)
@@ -271,7 +271,7 @@ class CoupledPDESolver(object):
                                       self.L_b_L, self.L_b_r, self.L_pde):
             # L_u_on_x_k = [np.dot(xtox, u) for (xtox, u) in zip(
             #         self.L_L_xtox[k], L_u)]
-            r[b_L:b_r] = self.d_dukdt(L_u, k, pde)
+            r[b_L:b_r] = self.d_dukdt(t, L_u, k, pde)
         return r
 
     def split_u(self, u):
@@ -280,7 +280,7 @@ class CoupledPDESolver(object):
         '''
         return [u[b_L:b_r] for (b_L, b_r) in zip(self.L_b_L, self.L_b_r)]
 
-    def d_dukdt(self, L_u, k, pde):
+    def d_dukdt(self, t, L_u, k, pde):
         L_u_on_x = [np.dot(x_to_x, utmp) for (x_to_x, utmp) in
                     zip(self.L_L_x_to_x[k], L_u)]
         u_k = L_u[k]
@@ -288,6 +288,7 @@ class CoupledPDESolver(object):
         r = np.zeros(np.size(u_k))
 
         r[1:-1] = pde.f(
+            t, pde.x[1:-1],
             [utmp[1:-1] for utmp in L_u_on_x],
             opdudx(u_k, pde.dx),
             opd2udx2(u_k, pde.dx))
@@ -295,9 +296,9 @@ class CoupledPDESolver(object):
         if type(pde.u_L) is SphericalVonNeumannZero:
             r[0] = r[1]
         else:
-            r[0] = pde.u_L.opdudt(L_u, u_k)
+            r[0] = pde.u_L.opdudt(t, pde.x[0], L_u, u_k)
 
-        r[-1] = pde.u_r.opdudt(L_u, u_k)
+        r[-1] = pde.u_r.opdudt(t, pde.x[-1], L_u, u_k)
 
         return r
 
