@@ -202,6 +202,18 @@ class SingleLinearPDE(PDE):
         super(SingleLinearPDE, self).__init__(f=f, **kwargs)
 
 
+def x_to_x(pde_1, pde_2):
+    a = np.tile(pde_1.x, (pde_2.n, 1))
+    b = np.tile(pde_2.x, (pde_1.n, 1)).T
+    a_l = a - pde_1.dx / 2
+    a_r = a + pde_1.dx / 2
+    b_l = b - pde_2.dx / 2
+    b_r = b + pde_2.dx / 2
+    x_l = np.maximum(a_l, b_l)
+    x_r = np.minimum(a_r, b_r)
+    return np.maximum(x_r - x_l, 0.) / pde_2.dx
+
+
 class CoupledPDESolver(object):
     """
     Time-varying reaction-diffusion solver for coupled species reactions
@@ -224,20 +236,8 @@ class CoupledPDESolver(object):
         if run:
             self.run()
 
-    @staticmethod
-    def x_to_x(pde_1, pde_2):
-        a = np.tile(pde_1.x, (pde_2.n, 1))
-        b = np.tile(pde_2.x, (pde_1.n, 1)).T
-        a_l = a - pde_1.dx / 2
-        a_r = a + pde_1.dx / 2
-        b_l = b - pde_2.dx / 2
-        b_r = b + pde_2.dx / 2
-        x_l = np.maximum(a_l, b_l)
-        x_r = np.minimum(a_r, b_r)
-        return np.maximum(x_r - x_l, 0.) / pde_2.dx
-
     def make_x_to_x(self):
-        self.L_L_x_to_x = [[self.x_to_x(pde_1, pde_2) for pde_1 in self.L_pde]
+        self.L_L_x_to_x = [[x_to_x(pde_1, pde_2) for pde_1 in self.L_pde]
                            for pde_2 in self.L_pde]
 
     def run(self):
