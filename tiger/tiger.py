@@ -131,6 +131,36 @@ class Continuity(object):
                 (self.left.dx / 2. + self.right.dx / 2.))
 
 
+class SphericalContinuity(Continuity):
+    '''
+    A continuity boundary condition for the heat equation in rectangular
+    coordinates with no source
+    '''
+    def opdudt(self, t, x, L_u, u_k):
+        '''
+        Operator giving du/dt for point of continuity. This kind of operator
+        for the continuity condition is specific to a problem type, but is not
+        difficult to re-implement for other problems. It would probably be
+        best to expand its usefulness by deriving it explicitly in terms of
+        du/dx and d2u/dx2 operators. As it is now, it's just the d2u/dx2
+        operator.
+        '''
+        r_a_m2 = self.left.x[-2]
+        r_ab = self.right.x[0]
+        r_b_1 = self.right.x[1]
+        # The same operator from opdudt in the Continuity class can be used
+        # here by scaling u by r as in the following 3 lines, and then scaling
+        # the result back again.
+        u_a_m2 = L_u[self.left_index][-2] * r_a_m2
+        u_ab = L_u[self.right_index][0] * r_ab
+        u_b_1 = L_u[self.right_index][1] * r_b_1
+        # This return is the same as Continuity.opdudt, but divided by r_ab
+        return ((self.right.D * (u_b_1 - u_ab) / self.right.dx -
+                 self.left.D * (u_ab - u_a_m2) / self.left.dx) /
+                (self.left.dx / 2. + self.right.dx / 2.)) / r_ab
+
+
+
 def opdudx(u, dx):
     """Applies second-order first-derivate finite difference operator on u
 
