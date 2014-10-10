@@ -208,6 +208,8 @@ class PDE(object):
         self.x = np.arange(0, n) * self.dx + self.x_L
         if issubclass(type(u_0), numbers.Number):
             self.u_0 = np.ones(n) * u_0
+        elif issubclass(type(u_0), np.ndarray):
+            self.u_0 = u_0
         else:
             self.u_0 = u_0(self.x)
         self.u_L = u_L
