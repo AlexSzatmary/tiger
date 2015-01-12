@@ -90,6 +90,35 @@ class SphericalVonNeumannZero(object):
         return 6 * self.pde.D * (u_k[1] - u_k[0]) / self.dx ** 2
 
 
+class CylindricalVonNeumannZero(object):
+    '''
+    This is the boundary condition to use for r=0 in a PDE in cylindrical
+    coordinates
+
+    It is always assumed that r in [0, r_max], so this bc is the bc at the
+    left end of the domain.
+    '''
+    def __init__(self):
+        pass
+
+    def set_pde(self, pde, side):
+        self.pde = pde
+        self.dx = pde.dx
+
+    def opdudt(self, t, x, L_u, u_k):
+        # This operator is derived as,
+        # du/dt = (D/r) d/dr (r du/dr)
+        #       = D * (d^2 u/dr^2 + (1 / r) * du / dr)
+        # Taking the limit as r -> 0:
+        # (1 / r) * du / dr -> 1 * d^2 u/dr^2
+        # therefore, du/dt = 2 * d^2 u / dr^2 in the limit of r -> 0
+        # d^2u/dr^2 @r=0 ~ (u[-1] - 2 * u[0] + u[1]) / dr^2
+        # u[-1] = u[1] (symmetry)
+        # therefore,
+        # du/dt = 2 * D * 2 * (u[1] - u[0]) / dr^2
+        return 4 * self.pde.D * (u_k[1] - u_k[0]) / self.dx ** 2
+
+
 class Continuity(object):
     '''
     A continuity boundary condition for the heat equation in rectangular
@@ -133,17 +162,37 @@ class Continuity(object):
 
 class SphericalContinuity(Continuity):
     '''
-    A continuity boundary condition for the heat equation in rectangular
+    A continuity boundary condition for the heat equation in spherical
     coordinates with no source
     '''
     def opdudt(self, t, x, L_u, u_k):
         '''
-        Operator giving du/dt for point of continuity. This kind of operator
-        for the continuity condition is specific to a problem type, but is not
-        difficult to re-implement for other problems. It would probably be
-        best to expand its usefulness by deriving it explicitly in terms of
-        du/dx and d2u/dx2 operators. As it is now, it's just the d2u/dx2
-        operator.
+        Operator giving du/dt for point of continuity in spherical coordinates
+        '''
+        r_a_m2 = self.left.x[-2]
+        r_ab = self.right.x[0]
+        r_b_1 = self.right.x[1]
+        # The same operator from opdudt in the Continuity class can be used
+        # here by scaling u by r as in the following 3 lines, and then scaling
+        # the result back again.
+        u_a_m2 = L_u[self.left_index][-2] * r_a_m2 ** 2
+        u_ab = L_u[self.right_index][0] * r_ab ** 2
+        u_b_1 = L_u[self.right_index][1] * r_b_1 ** 2
+        # This return is the same as Continuity.opdudt, but divided by r_ab
+        return ((self.right.D * (u_b_1 - u_ab) / self.right.dx -
+                 self.left.D * (u_ab - u_a_m2) / self.left.dx) /
+                (self.left.dx / 2. + self.right.dx / 2.)) / r_ab ** 2
+
+
+
+class CylindricalContinuity(Continuity):
+    '''
+    A continuity boundary condition for the heat equation in cylindrical
+    coordinates with no source
+    '''
+    def opdudt(self, t, x, L_u, u_k):
+        '''Operator giving du/dt for point of continuity in cylindrical
+        coordinates
         '''
         r_a_m2 = self.left.x[-2]
         r_ab = self.right.x[0]
