@@ -324,6 +324,49 @@ class CoupledPDESolver(object):
         return r
 
 
+class CoupledPDESolver2(CoupledPDESolver):
+    @staticmethod
+    def d_dudt(u, t, self):
+        """"
+        Discretized application of dudt
+
+        Watch out! Because this is a staticmethod, as required by odeint, self
+        is the third argument
+        """
+        # Split the u vector into vectors representing each function being
+        # solved for. Note that this creates views of u, so each item in L_u
+        # should not be modified.
+        L_u = self.split_u(u)
+        r = np.zeros(np.shape(u))
+        for (k, b_L, b_r, pde) in zip(range(len(self.L_pde)),
+                                      self.L_b_L, self.L_b_r, self.L_pde):
+            # L_u_on_x_k = [np.dot(xtox, u) for (xtox, u) in zip(
+            #         self.L_L_xtox[k], L_u)]
+            r[b_L:b_r] = self.d_dukdt(t, L_u, k, pde)
+        return r
+
+    def split_u(self, u):
+        '''
+        Splits the u vector handled by odeint into each u_i
+        '''
+        return [u[b_L:b_r] for (b_L, b_r) in zip(self.L_b_L, self.L_b_r)]
+
+    def d_dukdt(self, t, L_u, k, pde):
+        u_k = L_u[k]
+        # r is the value of du/dt, not the new u value.
+        r = np.zeros(np.size(u_k))
+
+        r[1:-1] = pde.f(
+            t, pde.x[1:-1],
+            L_u,
+            opdudx(u_k, pde.dx),
+            opd2udx2(u_k, pde.dx))
+        r[0] = pde.u_L.opdudt(t, pde.x[0], L_u, u_k)
+        r[-1] = pde.u_r.opdudt(t, pde.x[-1], L_u, u_k)
+        return r
+    
+
+
 class PDESolver(CoupledPDESolver):
     """Time-varying reaction-diffusion type of solver
     Solves du/dt = f(u, du/dx, d2u/dx2)"""
