@@ -1,1 +1,1 @@
-from tiger import *
+from .tiger import *
