@@ -350,6 +350,7 @@ class CoupledPDESolver(object):
             r[b_L:b_r] = self.d_dukdt(t, L_u, k, pde)
         return r
 
+
     def split_u(self, u):
         '''
         Splits the u vector handled by odeint into each u_i
@@ -416,11 +417,36 @@ class CoupledPDESolver2(CoupledPDESolver):
     
 
 
+class CoupledPDEStepper2(CoupledPDESolver2):
+    def __init__(self, **kwargs):
+        super().__init__(run=False, **kwargs)
+        self.u_0 = np.hstack([pde.u_0 for pde in self.L_pde])
+        for pde in self.L_pde:
+            pde.u = np.zeros((self.Nt, np.size(pde.u_0)))
+            pde.u[0] = pde.u_0
+        self.u = np.zeros((self.Nt, np.size(self.u_0)))
+        self.u[0] = self.u_0
+
+    def step(self, clock):
+        ig = scipy.integrate.ode(self.stepper_d_dudt)
+        ig.set_integrator('lsoda', atol=1e-3, rtol=1e-3)
+        ig.set_initial_value(self.u[clock - 1], t=self.t[clock - 1])
+        ig.set_f_params(self)
+        u_next = ig.integrate(self.t[clock])
+#        print(ig.successful())
+        self.u[clock] = u_next
+        for (b_L, b_r, pde) in zip(self.L_b_L, self.L_b_r, self.L_pde):
+            pde.u[clock] = self.u[clock, b_L:b_r]
+
+    @staticmethod
+    def stepper_d_dudt(t, u, self):
+        return self.d_dudt(u, t, self)
+
 class PDESolver(CoupledPDESolver):
     """Time-varying reaction-diffusion type of solver
     Solves du/dt = f(u, du/dx, d2u/dx2)"""
     def __init__(self, pde=None, **kwargs):
-        super(PDESolver, self).__init__(L_pde=[pde], **kwargs)
+        super().__init__(L_pde=[pde], run=False, **kwargs)
         self.pde = self.L_pde[0]
 
 
