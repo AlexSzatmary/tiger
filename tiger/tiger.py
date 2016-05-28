@@ -304,7 +304,7 @@ class CoupledPDESolver(object):
     dv/dt = f(v, dv/dx, d2v/dx2, u)
     etc.
     """
-    def __init__(self, L_pde=None, dt=None, Nt=None, run=False):
+    def __init__(self, L_pde=None, dt=None, Nt=None, run=False, use_x_to_x=True):
         self.L_pde = L_pde
         self.dt = dt
         self.Nt = Nt
@@ -313,7 +313,8 @@ class CoupledPDESolver(object):
         L_n = [pde.n for pde in L_pde]
         self.L_b_r = np.cumsum(L_n)
         self.L_b_L = self.L_b_r - L_n
-        self.make_x_to_x()
+        if use_x_to_x:
+            self.make_x_to_x()
         if run:
             self.run()
 
@@ -375,6 +376,9 @@ class CoupledPDESolver(object):
 
 
 class CoupledPDESolver2(CoupledPDESolver):
+    def __init__(self, **kwargs):
+        super().__init__(use_x_to_x=False, **kwargs)
+
     @staticmethod
     def d_dudt(u, t, self):
         """"
@@ -390,8 +394,6 @@ class CoupledPDESolver2(CoupledPDESolver):
         r = np.zeros(np.shape(u))
         for (k, b_L, b_r, pde) in zip(range(len(self.L_pde)),
                                       self.L_b_L, self.L_b_r, self.L_pde):
-            # L_u_on_x_k = [np.dot(xtox, u) for (xtox, u) in zip(
-            #         self.L_L_xtox[k], L_u)]
             r[b_L:b_r] = self.d_dukdt(t, L_u, k, pde)
         return r
 
