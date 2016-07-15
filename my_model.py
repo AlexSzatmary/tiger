@@ -1,3 +1,5 @@
+# This list of models has been useful in developing the code, but is
+# not actively maintained.
 import numpy as np
 from tiger import *
 

@@ -1,3 +1,5 @@
+# The following models are spare parts
+
 # Turing type model
 class Model(object):
     def __init__(self, N=16, dx = None, fu=None, fv=None, gu=None, gv=None,

@@ -7,9 +7,9 @@ import numbers
 
 # Boundary conditions
 class Dirichlet(object):
-    '''
+    """
     Represents Dirichlet boundary conditions that are constant over time.
-    '''
+    """
     def __init__(self, u_0):
         self.u_0 = u_0
 
@@ -41,12 +41,12 @@ class Robin(object):
     def opd2udx2(self, u):
         if self.side == 'left':
             return (2 * u[1] +
-                    (-2 + 2 * self.dx * self.a / self.b) * u[0]
-                    - 2 * self.dx * self.c / self.b) / self.dx ** 2
+                    (-2 + 2 * self.dx * self.a / self.b) * u[0] +
+                    (-2) * self.dx * self.c / self.b) / self.dx ** 2
         elif self.side == 'right':
             return (2 * u[-2] +
-                    (-2 - 2 * self.dx * self.a / self.b) * u[-1]
-                    + 2 * self.dx * self.c / self.b) / self.dx ** 2
+                    (-2 - 2 * self.dx * self.a / self.b) * u[-1] +
+                    2 * self.dx * self.c / self.b) / self.dx ** 2
 
     def opdudt(self, t, x, L_u, u_k):
         if self.side == 'left':
@@ -62,13 +62,13 @@ class VonNeumann(Robin):
 
 
 class SphericalVonNeumannZero(object):
-    '''
+    """
     This is the boundary condition to use for r=0 in a PDE in spherical
     coordinates
 
     It is always assumed that r in [0, r_max], so this bc is the bc at the
     left end of the domain.
-    '''
+    """
     def __init__(self):
         pass
 
@@ -91,13 +91,13 @@ class SphericalVonNeumannZero(object):
 
 
 class CylindricalVonNeumannZero(object):
-    '''
+    """
     This is the boundary condition to use for r=0 in a PDE in cylindrical
     coordinates
 
     It is always assumed that r in [0, r_max], so this bc is the bc at the
     left end of the domain.
-    '''
+    """
     def __init__(self):
         pass
 
@@ -120,12 +120,12 @@ class CylindricalVonNeumannZero(object):
 
 
 class Continuity(object):
-    '''
+    """
     A continuity boundary condition for the heat equation in rectangular
     coordinates with no source
-    '''
+    """
     def __init__(self, left_index=None, right_index=None, L_pde=None):
-        '''
+        """
         Set up the continuity condition for the diffusion after initializing
         the PDEs it links. left_index and right_index are the indices to L_pde
         that give the subdomains on the left and right sides of the continuity
@@ -133,7 +133,7 @@ class Continuity(object):
 
         This assumes that u at the point of continuity is the same for both
         subdomains.
-        '''
+        """
         self.left_index = left_index
         self.right_index = right_index
 
@@ -144,14 +144,14 @@ class Continuity(object):
             self.left = pde
 
     def opdudt(self, t, x, L_u, u_k):
-        '''
+        """
         Operator giving du/dt for point of continuity. This kind of operator
         for the continuity condition is specific to a problem type, but is not
         difficult to re-implement for other problems. It would probably be
         best to expand its usefulness by deriving it explicitly in terms of
         du/dx and d2u/dx2 operators. As it is now, it's just the d2u/dx2
         operator.
-        '''
+        """
         u_a_m2 = L_u[self.left_index][-2]
         u_ab = L_u[self.right_index][0]
         u_b_1 = L_u[self.right_index][1]
@@ -161,14 +161,14 @@ class Continuity(object):
 
 
 class SphericalContinuity(Continuity):
-    '''
+    """
     A continuity boundary condition for the heat equation in spherical
     coordinates with no source
-    '''
+    """
     def opdudt(self, t, x, L_u, u_k):
-        '''
+        """
         Operator giving du/dt for point of continuity in spherical coordinates
-        '''
+        """
         r_a_m2 = self.left.x[-2]
         r_ab = self.right.x[0]
         r_b_1 = self.right.x[1]
@@ -184,16 +184,15 @@ class SphericalContinuity(Continuity):
                 (self.left.dx / 2. + self.right.dx / 2.)) / r_ab ** 2
 
 
-
 class CylindricalContinuity(Continuity):
-    '''
+    """
     A continuity boundary condition for the heat equation in cylindrical
     coordinates with no source
-    '''
+    """
     def opdudt(self, t, x, L_u, u_k):
-        '''Operator giving du/dt for point of continuity in cylindrical
+        """Operator giving du/dt for point of continuity in cylindrical
         coordinates
-        '''
+        """
         r_a_m2 = self.left.x[-2]
         r_ab = self.right.x[0]
         r_b_1 = self.right.x[1]
@@ -207,7 +206,6 @@ class CylindricalContinuity(Continuity):
         return ((self.right.D * (u_b_1 - u_ab) / self.right.dx -
                  self.left.D * (u_ab - u_a_m2) / self.left.dx) /
                 (self.left.dx / 2. + self.right.dx / 2.)) / r_ab
-
 
 
 def opdudx(u, dx):
@@ -284,6 +282,9 @@ class SingleLinearPDE(PDE):
 
 
 def x_to_x(pde_1, pde_2):
+    """
+    Makes a matrix that can map values from one PDE to another
+    """
     a = np.tile(pde_1.x, (pde_2.n, 1))
     b = np.tile(pde_2.x, (pde_1.n, 1)).T
     a_l = a - pde_1.dx / 2
@@ -304,7 +305,8 @@ class CoupledPDESolver(object):
     dv/dt = f(v, dv/dx, d2v/dx2, u)
     etc.
     """
-    def __init__(self, L_pde=None, dt=None, Nt=None, run=False, use_x_to_x=True):
+    def __init__(self, L_pde=None, dt=None, Nt=None, run=False,
+                 use_x_to_x=True):
         self.L_pde = L_pde
         self.dt = dt
         self.Nt = Nt
@@ -351,11 +353,10 @@ class CoupledPDESolver(object):
             r[b_L:b_r] = self.d_dukdt(t, L_u, k, pde)
         return r
 
-
     def split_u(self, u):
-        '''
+        """
         Splits the u vector handled by odeint into each u_i
-        '''
+        """
         return [u[b_L:b_r] for (b_L, b_r) in zip(self.L_b_L, self.L_b_r)]
 
     def d_dukdt(self, t, L_u, k, pde):
@@ -376,6 +377,10 @@ class CoupledPDESolver(object):
 
 
 class CoupledPDESolver2(CoupledPDESolver):
+    """
+    CoupledPDESolver2 is like CoupledPDESolver, but runs a little faster, as it
+    lacks the ability to solve PDEs on different, overlapping grids.
+    """
     def __init__(self, **kwargs):
         super().__init__(use_x_to_x=False, **kwargs)
 
@@ -398,12 +403,15 @@ class CoupledPDESolver2(CoupledPDESolver):
         return r
 
     def split_u(self, u):
-        '''
+        """
         Splits the u vector handled by odeint into each u_i
-        '''
+        """
         return [u[b_L:b_r] for (b_L, b_r) in zip(self.L_b_L, self.L_b_r)]
 
     def d_dukdt(self, t, L_u, k, pde):
+        """
+        Build the part of the du/dt vector for the kth PDE
+        """
         u_k = L_u[k]
         # r is the value of du/dt, not the new u value.
         r = np.zeros(np.size(u_k))
@@ -416,7 +424,6 @@ class CoupledPDESolver2(CoupledPDESolver):
         r[0] = pde.u_L.opdudt(t, pde.x[0], L_u, u_k)
         r[-1] = pde.u_r.opdudt(t, pde.x[-1], L_u, u_k)
         return r
-    
 
 
 class CoupledPDEStepper2(CoupledPDESolver2):
@@ -444,9 +451,12 @@ class CoupledPDEStepper2(CoupledPDESolver2):
     def stepper_d_dudt(t, u, self):
         return self.d_dudt(u, t, self)
 
+
 class PDESolver(CoupledPDESolver):
-    """Time-varying reaction-diffusion type of solver
-    Solves du/dt = f(u, du/dx, d2u/dx2)"""
+    """
+    Time-varying reaction-diffusion type of solver
+    Solves du/dt = f(u, du/dx, d2u/dx2)
+    """
     def __init__(self, pde=None, **kwargs):
         super().__init__(L_pde=[pde], run=False, **kwargs)
         self.pde = self.L_pde[0]
